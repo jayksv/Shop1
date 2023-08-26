@@ -399,12 +399,26 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
         }
 
-        if (user.getPassword().length() < 8 ||
-                !user.getPassword().matches(".*[A-Z].*") || // Contains at least one uppercase letter
-                !user.getPassword().matches(".*[a-z].*") || // Contains at least one lowercase letter
-                !user.getPassword().matches(".*\\d.*") ||  // Contains at least one digit
-                !user.getPassword().matches(".*[@#$%^&+=!].*")) { // Contains at least one special character
-            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Invalid password. Password should be at least 8 characters long and meet complexity requirements.", null);
+        String password = user.getPassword();
+
+        if (password.length() < 8) {
+            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Password should be at least 8 characters long.", null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+        }
+        if (!password.matches(".*[a-z].*")) {
+            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one lowercase letter.", null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one uppercase letter.", null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+        }
+        if (!password.matches(".*\\d.*")) {
+            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one digit.", null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
+        }
+        if (!password.matches(".*[@#$%^&+=].*")) {
+            ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Password should contain at least one special character.", null);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
         }
 

@@ -36,7 +36,7 @@ public class product_entity {
     @Column(name = "user_id")
     private Long user_id;
 
-    @Column(name = "shope_id", nullable = false)
+    @Column(name = "shope_id")
     private Long shope_id;
 
     @Column(name = "product_image")
@@ -45,6 +45,6 @@ public class product_entity {
     @Column(name = "product_any_image")
     private String product_any_image;
 
-    @Column(name = "category_name")
-    private String category_name;
+    @Column(name = "category_id")
+    private String category_id;
 }

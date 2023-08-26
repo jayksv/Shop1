@@ -23,5 +23,5 @@ public class ProductDTO {
     private String product_image;
     private String product_any_image;
     private String createBy;
-    private String category_name;
+    private String category_id;
 }
