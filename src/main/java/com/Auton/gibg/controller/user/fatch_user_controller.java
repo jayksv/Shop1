@@ -1,8 +1,6 @@
 package com.Auton.gibg.controller.user;
 
-import com.Auton.gibg.entity.user.user_entity;
-import com.Auton.gibg.response.usersDTO.usersAllDTO;
-import com.Auton.gibg.response.usersDTO.userById_subadminDTO;
+import com.Auton.gibg.entity.shopstatus.ShopDTO;
 import com.Auton.gibg.response.usersDTO.userById_shopOwner;
 import com.Auton.gibg.response.ResponseWrapper;
 import io.jsonwebtoken.Claims;
@@ -477,7 +475,7 @@ public class fatch_user_controller {
             String role = claims.get("role_name", String.class);
 
             // Check if the user has the appropriate role to perform this action (e.g., admin)
-            if (!"shopowner".equalsIgnoreCase(role)) {
+            if (!"shop owner".equalsIgnoreCase(role)) {
                 ResponseWrapper<List<userById_shopOwner>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
             }
@@ -665,5 +663,107 @@ public class fatch_user_controller {
     }
 
 
+    // shop info
+
+    @GetMapping("/user/shop/info")
+    public ResponseEntity<ResponseWrapper<ShopDTO>> getShopInfo(
+            @RequestHeader("Authorization") String authorizationHeader
+    ) {
+        try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Authorization header is missing or empty.", null));
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseWrapper<>("Token has expired.", null));
+            }
+
+            // Extract necessary claims (you can add more as needed)
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+            String role = claims.get("role_name", String.class);
+            System.out.println(authenticatedUserId);
+
+            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
+            if (!"shop owner".equalsIgnoreCase(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ResponseWrapper<>("You are not authorized to perform this action.", null));
+            }
+
+            // Query the database to retrieve the specific user data by userId
+            String sql = "SELECT  s.shop_name, s.shop_status_id,s.shop_type_id,s.shop_id, s.street_address, s.city, s.state, s.postal_code, s.country, s.latitude, s.longitude, u.first_name AS owner_name, ss.status_name, st.type_name, s.shop_image, s.monday_open, s.monday_close, s.tuesday_open, s.tuesday_close, s.wednesday_open, s.wednesday_close, s.thursday_open, s.thursday_close, s.friday_open, s.friday_close, s.saturday_open, s.saturday_close, s.sunday_open, s.sunday_close, s.created_at\n" +
+                    "FROM tb_shop s JOIN tb_users u ON s.shop_id = u.shop_id \n" +
+                    "JOIN shop_status ss ON s.shop_status_id = ss.status_id \n" +
+                    "JOIN tb_shop_types st ON s.shop_type_id = st.type_id\n" +
+                    "where u.user_id =?";
+            ShopDTO shopDTO = jdbcTemplate.queryForObject(sql, new Object[]{authenticatedUserId}, (resultSet, rowNum) -> {
+                ShopDTO shop = new ShopDTO();
+                shop.setShopId(resultSet.getLong("shop_id"));
+               shop.setShopName(resultSet.getString("shop_name"));
+                shop.setStatus_name(resultSet.getString("status_name"));
+
+
+
+                shop.setStreetAddress(resultSet.getString("street_address"));
+                shop.setCity(resultSet.getString("city"));
+                shop.setState(resultSet.getString("state"));
+                shop.setPostalCode(resultSet.getString("postal_code"));
+                shop.setCountry(resultSet.getString("country"));
+                shop.setLatitude(resultSet.getBigDecimal("latitude"));
+                shop.setLongitude(resultSet.getBigDecimal("longitude"));
+                shop.setShopType(resultSet.getInt("shop_type_id"));
+                shop.setStatus_name(resultSet.getString("status_name"));
+                shop.setShop_status_id(resultSet.getLong("shop_status_id"));
+                shop.setShopImage(resultSet.getString("shop_image"));
+                shop.setMondayOpen(resultSet.getString("monday_open"));
+                shop.setMondayClose(resultSet.getString("monday_close"));
+                shop.setTuesdayOpen(resultSet.getString("tuesday_open"));
+                shop.setTuesdayClose(resultSet.getString("tuesday_close"));
+                shop.setWednesdayOpen(resultSet.getString("wednesday_open"));
+                shop.setWednesdayClose(resultSet.getString("wednesday_close"));
+                shop.setThursdayOpen(resultSet.getString("thursday_open"));
+                shop.setThursdayClose(resultSet.getString("thursday_close"));
+                shop.setFridayOpen(resultSet.getString("friday_open"));
+                shop.setFridayClose(resultSet.getString("friday_close"));
+                shop.setSaturdayOpen(resultSet.getString("saturday_open"));
+                shop.setSaturdayClose(resultSet.getString("saturday_close"));
+                shop.setSundayOpen(resultSet.getString("sunday_open"));
+                shop.setSundayClose(resultSet.getString("sunday_close"));
+                return shop;
+            });
+
+            if (shopDTO == null) {
+                // If shopDTO is null, the shop with the given user ID was not found
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ResponseWrapper<>("Shop not found.", null));
+            }
+
+            return ResponseEntity.ok(new ResponseWrapper<>("Shop data retrieved successfully.", shopDTO));
+
+        } catch (JwtException e) {
+            // Token is invalid or has expired
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>("Token is invalid.", null));
+        } catch (EmptyResultDataAccessException e) {
+            // User not found
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ResponseWrapper<>("shop not found.", null));
+        } catch (Exception e) {
+            String errorMessage = "An error occurred while retrieving user data.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseWrapper<>(errorMessage, null));
+        }
+    }
 
 }

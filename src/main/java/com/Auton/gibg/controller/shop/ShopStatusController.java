@@ -1,15 +1,15 @@
 package com.Auton.gibg.controller.shop;
 
-
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/shop")
-public class shop_controller {
+@RequestMapping(value = "/api/shop_status")
+public class ShopStatusController {
+//
 //    private final JdbcTemplate jdbcTemplate;
 //
 //    @Autowired
-//    public shop_controller(JdbcTemplate jdbcTemplate) {
+//    public ShopStatusController(JdbcTemplate jdbcTemplate) {
 //        this.jdbcTemplate = jdbcTemplate;
 //    }
 //
@@ -66,5 +66,4 @@ public class shop_controller {
 //            return new ResponseEntity<>("Error updating shop status.", HttpStatus.INTERNAL_SERVER_ERROR);
 //        }
 //    }
-
 }

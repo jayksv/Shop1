@@ -435,6 +435,7 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
             // Save the user address
             address_entity savedAddress = address_repoittory.save(userAddress);
             // shop information
+            userShop.setShop_status_id((long)3);
             shop_entity savedShop = shop_repostory.save(userShop);
 
 

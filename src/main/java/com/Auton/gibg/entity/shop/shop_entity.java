@@ -16,81 +16,88 @@ import java.sql.Time;
 @NoArgsConstructor
 @AllArgsConstructor
 public class shop_entity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "shop_id")
-    private Long shopId;
 
-    @Column(name = "shop_name")
-    private String shopName;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        @Column(name = "shop_id")
+        private Long shopId;
 
-    @Column(name = "street_address")
-    private String streetAddress;
+        @Column(name = "shop_name")
+        private String shopName;
 
-    @Column(name = "city")
-    private String city;
+        @Column(name = "street_address")
+        private String streetAddress;
 
-    @Column(name = "state")
-    private String state;
+        @Column(name = "city")
+        private String city;
 
-    @Column(name = "postal_code")
-    private String postalCode;
+        @Column(name = "state")
+        private String state;
 
-    @Column(name = "country")
-    private String country;
+        @Column(name = "postal_code")
+        private String postalCode;
 
-    @Column(name = "latitude")
-    private BigDecimal latitude;
+        @Column(name = "country")
+        private String country;
 
-    @Column(name = "longitude")
-    private BigDecimal longitude;
+        @Column(name = "latitude")
+        private BigDecimal latitude;
 
-    @Column(name = "monday_open")
-    private Time mondayOpen;
+        @Column(name = "longitude")
+        private BigDecimal longitude;
 
-    @Column(name = "monday_close")
-    private Time mondayClose;
+        @Column(name = "monday_open")
+        private Time mondayOpen;
 
-    @Column(name = "tuesday_open")
-    private Time tuesday_open;
+        @Column(name = "monday_close")
+        private Time mondayClose;
 
-    @Column(name = "tuesday_close")
-    private Time tuesday_close;
+        @Column(name = "tuesday_open")
+        private Time tuesday_open;
 
-    @Column(name = "wednesday_open")
-    private Time wednesday_open;
+        @Column(name = "tuesday_close")
+        private Time tuesday_close;
 
-    @Column(name = "wednesday_close")
-    private Time wednesday_close;
+        @Column(name = "wednesday_open")
+        private Time wednesday_open;
 
-    @Column(name = "thursday_open")
-    private Time thursday_open;
+        @Column(name = "wednesday_close")
+        private Time wednesday_close;
 
-    @Column(name = "thursday_close")
-    private Time thursday_close;
+        @Column(name = "thursday_open")
+        private Time thursday_open;
 
-    @Column(name = "friday_open")
-    private Time friday_open;
+        @Column(name = "thursday_close")
+        private Time thursday_close;
 
-    @Column(name = "friday_close")
-    private Time friday_close;
+        @Column(name = "friday_open")
+        private Time friday_open;
 
-    @Column(name = "saturday_open")
-    private Time saturday_open;
+        @Column(name = "friday_close")
+        private Time friday_close;
 
-    @Column(name = "saturday_close")
-    private Time saturday_close;
+        @Column(name = "saturday_open")
+        private Time saturday_open;
 
-    @Column(name = "sunday_open")
-    private Time sunday_open;
+        @Column(name = "saturday_close")
+        private Time saturday_close;
 
-    @Column(name = "sunday_close")
-    private Time sunday_close;
+        @Column(name = "sunday_open")
+        private Time sunday_open;
 
-    @Column(name = "type_id")
-    private Long shop_type;
+        @Column(name = "sunday_close")
+        private Time sunday_close;
 
-    @Column(name = "shop_image")
-    private String shop_image;
+// @Column(name = "type_id")
+// private Long shop_type;
 
-}
+        @Column(name = "shop_image")
+        private String shop_image;
+
+        @Column(name = "shop_type_id")
+        private Long shop_type_id;
+
+        @Column(name = "shop_status_id")
+        private Long shop_status_id;
+
+    }
