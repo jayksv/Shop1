@@ -1,4 +1,4 @@
-package com.Auton.gibg.response.usersDTO;
+package com.Auton.gibg.response.product;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 
 @Getter
 @Setter
@@ -14,14 +16,17 @@ import java.math.BigDecimal;
 public class ProductDTO {
 
     private Long product_id;
-    private String product_name;
     private String description;
-    private BigDecimal price;
-    private Integer stock_quantity;
+    private String product_name;
+    private Double price;
+    private Long stock_quantity;
     private Long user_id;
     private Long shope_id;
+    private Long category_id;
     private String product_image;
-    private String product_any_image;
-    private String createBy;
-    private String category_id;
+    private Date createAt;
+
+    private String create_by;
+    private String category_name;
+    private String shop_name;
 }

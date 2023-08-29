@@ -85,8 +85,7 @@ public class user_controller {
 
 
             // Custom SQL query to retrieve user by email
-            String sql = "SELECT tb_users.user_id, tb_users.email, tb_users.first_name, tb_users.last_name, tb_users.role_id,tb_users.password, tb_role.role_name FROM tb_users JOIN tb_role ON tb_users.role_id = tb_role.role_id " +
-                    "WHERE is_active = 'Active' AND (tb_users.role_id = 3)  and email = ? ";
+            String sql = "SELECT tb_users.user_id, tb_users.email, tb_users.first_name, tb_users.last_name, tb_users.role_id,tb_users.password, tb_users.shop_id,tb_role.role_name FROM tb_users JOIN tb_role ON tb_users.role_id = tb_role.role_id WHERE is_active = 'Active' AND (tb_users.role_id = 3)  and email = ? ";
             user_entity userExist = jdbcTemplate.queryForObject(sql, new Object[]{user.getEmail()}, (resultSet, rowNum) -> {
                 user_entity userEntity = new user_entity();
                 userEntity.setUser_id(resultSet.getLong("user_id"));
@@ -96,6 +95,7 @@ public class user_controller {
                 userEntity.setGender(resultSet.getString("role_name"));
                 userEntity.setPassword(resultSet.getString("password"));
                 userEntity.setRole_id(resultSet.getLong("role_id"));
+                userEntity.setShop_id(resultSet.getLong("shop_id"));
                 return userEntity;
             });
 
@@ -110,6 +110,7 @@ public class user_controller {
                     claims.put("last_name", userExist.getLast_name());
                     claims.put("role_name", userExist.getGender());
                     claims.put("role_id", userExist.getRole_id());
+                    claims.put("shop_id", userExist.getShop_id());
 
                     String token = Jwts.builder()
                             .setClaims(claims)

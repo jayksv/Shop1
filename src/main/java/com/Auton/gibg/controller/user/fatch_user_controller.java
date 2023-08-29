@@ -481,7 +481,15 @@ public class fatch_user_controller {
             }
 
             // Query the database to retrieve the user data with specific criteria
-            String sql = "SELECT `user_id`, `email`, `first_name`, `last_name`, `birthdate`, `gender`, `profile_picture`, `created_at`, `last_login`, `is_active`, `bio`, `role_id`, `role_name`, `user_address`, `user_state`, `user_postal_code`, `user_country`, `user_latitude`, `user_longitude`, `shop_id`, `shop_name`, `shop_address`, `city`, `shop_state`, `shop_postal_code`, `shop_country`, `shop_latitude`, `shop_longitude`, `type_id`, `shop_image`, `monday_open`, `monday_close`, `tuesday_open`, `tuesday_close`, `wednesday_open`, `wednesday_close`, `thursday_open`, `thursday_close`, `friday_open`, `friday_close`, `saturday_open`, `saturday_close`, `sunday_open`, `sunday_close`, `shop_created_at` FROM `user_shop_view` ";
+            String sql = "SELECT `user_id`, `email`, `first_name`, `last_name`, `birthdate`," +
+                    " `gender`, `profile_picture`, `created_at`, `last_login`, `is_active`," +
+                    " `bio`, `role_id`, `role_name`, `user_address`, `user_state`, `user_postal_code`," +
+                    " `user_country`, `user_latitude`, `user_longitude`, `shop_id`, `shop_name`," +
+                    " `shop_address`, `city`, `shop_state`, `shop_postal_code`, `shop_country`," +
+                    " `shop_latitude`, `shop_longitude`, `type_id`, `shop_image`, `monday_open`," +
+                    " `monday_close`, `tuesday_open`, `tuesday_close`, `wednesday_open`, `wednesday_close`," +
+                    " `thursday_open`, `thursday_close`, `friday_open`, `friday_close`, `saturday_open`," +
+                    " `saturday_close`, `sunday_open`, `sunday_close`, `shop_created_at` FROM `user_shop_view` ";
             List<userById_shopOwner> userDTOList = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
                 userById_shopOwner userOneShopower = new userById_shopOwner();
                 userOneShopower.setUser_id(resultSet.getLong("user_id"));

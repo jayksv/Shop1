@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping(value = "/api/admin/category")
+@RequestMapping(value = "/api/shop/category")
 public class category_controller {
     private final category_repository categoryRepository;
     private final authToken authService;

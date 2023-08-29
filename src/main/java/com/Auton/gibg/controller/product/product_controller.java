@@ -1,40 +1,44 @@
 package com.Auton.gibg.controller.product;
 
 
-
 import com.Auton.gibg.entity.product.product_entity;
-import com.Auton.gibg.entity.user.user_entity;
 import com.Auton.gibg.middleware.authToken;
 import com.Auton.gibg.repository.product.color_repository;
 import com.Auton.gibg.repository.product.product_image_repository;
+import com.Auton.gibg.repository.product.product_repository;
 import com.Auton.gibg.repository.product.size_repository;
+import com.Auton.gibg.repository.user.user_repository;
 import com.Auton.gibg.response.ResponseWrapper;
-import com.Auton.gibg.response.usersDTO.ProductDTO;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.Auton.gibg.response.product.ProductDTO;
+import com.Auton.gibg.response.product.ProductWithColorsSizesAndImagesResponse;
+import com.Auton.gibg.response.product.productColorSizeImageDTO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
-import com.Auton.gibg.repository.product.product_repository;
-import com.Auton.gibg.repository.user.user_repository;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/shopowner")
 public class product_controller {
-    @Value("${jwt_secret}")
-    private String jwt_secret;
+    private static final Long DEFAULT_USER_ID = 0L;
+    private static final Long DEFAULT_SHOPE_ID = 0L;
     private final JdbcTemplate jdbcTemplate;
     private final authToken authService;
-
+    @Value("${jwt_secret}")
+    private String jwt_secret;
     @Autowired
     private color_repository colorRepository;
 
@@ -52,172 +56,78 @@ public class product_controller {
         this.jdbcTemplate = jdbcTemplate;
         this.authService = authService;
     }
+
     @GetMapping("/product/all")
-    public ResponseEntity<ResponseWrapper<List<ProductDTO>>> getProductOnly(
-            @RequestHeader("Authorization") String authorizationHeader
-    ) {
+    public ResponseEntity<?> getAllProducts(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<List<ProductDTO>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                // Token is invalid or has expired
+                ResponseWrapper<?> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
 
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret) // Replace with your secret key
-                    .parseClaimsJws(token)
-                    .getBody();
 
-            // Check token expiration
-            Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<List<ProductDTO>> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            String sql = "SELECT tb_products.product_id, tb_products.description, tb_products.product_name, tb_products.price, tb_products.stock_quantity, tb_products.user_id, tb_products.shope_id, tb_products.category_id, tb_products.product_image, tb_products.created_at, tb_categories.category_name, tb_users.first_name, tb_users.last_name, CONCAT(tb_users.first_name, ' ', tb_users.last_name) AS full_name, tb_shop.shop_name FROM `tb_products` JOIN tb_categories ON tb_products.category_id = tb_categories.category_id JOIN tb_users ON tb_products.user_id = tb_users.user_id JOIN tb_shop ON tb_products.shope_id = tb_shop.shop_id;";
+            List<ProductDTO> products = jdbcTemplate.query(sql, this::mapProductRow);
+
+            List<productColorSizeImageDTO> responses = new ArrayList<>();
+            for (ProductDTO product : products) {
+                List<color_entity> colors = findColorsByProductId(product.getProduct_id());
+                List<size_entity> sizes = findSizesByProductId(product.getProduct_id());
+                List<product_image_entity> productImages = findProductImagesByProductId(product.getProduct_id());
+
+                productColorSizeImageDTO response = new productColorSizeImageDTO("Success", product, colors, sizes, productImages);
+                responses.add(response);
             }
 
-            // Extract necessary claims (you can add more as needed)
-            Long authenticatedUserId = claims.get("user_id", Long.class);
-            String role = claims.get("role_name", String.class);
-
-            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            if (!"shop owner".equalsIgnoreCase(role)) {
-                ResponseWrapper<List<ProductDTO>> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
-
-            // Query the database to retrieve product data
-            String sql = "SELECT\n" +
-                    "    p.product_id,\n" +
-                    "    p.product_name,\n" +
-                    "    p.description,\n" +
-                    "    p.price,\n" +
-                    "    p.stock_quantity,\n" +
-                    "    p.created_at,\n" +
-                    "    p.user_id,\n" +
-                    "    p.shope_id,\n" +
-                    "    p.product_image,\n" +
-                    "    p.product_any_image,\n" +
-                    "    p.category_id,\n" +
-                    "    u.first_name,\n" +
-                    "    c.category_id\n" +
-                    "FROM tb_products p\n" +
-                    "JOIN tb_users u ON p.user_id = u.user_id\n" +
-                    "JOIN tb_categories c ON p.category_id = c.category_id";
-            List<ProductDTO> productDTOList = jdbcTemplate.query(sql, (resultSet, rowNum) -> {
-                ProductDTO productDTO = new ProductDTO();
-                productDTO.setProduct_id(resultSet.getLong("product_id"));
-                productDTO.setDescription(resultSet.getString("description"));
-                productDTO.setProduct_name(resultSet.getString("product_name"));
-                productDTO.setPrice(resultSet.getBigDecimal("price"));
-                productDTO.setStock_quantity(resultSet.getInt("stock_quantity"));
-                productDTO.setUser_id(resultSet.getLong("user_id"));
-                productDTO.setShope_id(resultSet.getLong("shope_id"));
-                productDTO.setProduct_image(resultSet.getString("product_image"));
-                productDTO.setProduct_any_image(resultSet.getString("product_any_image"));
-                productDTO.setCategory_id(resultSet.getString("category_id"));
-                productDTO.setCreateBy(resultSet.getString("first_name"));
-
-                return productDTO;
-            });
-
-            ResponseWrapper<List<ProductDTO>> responseWrapper = new ResponseWrapper<>("Product data retrieved successfully.", productDTOList);
-            return ResponseEntity.ok(responseWrapper);
-        } catch (JwtException e) {
-            // Token is invalid or has expired
-            ResponseWrapper<List<ProductDTO>> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            return ResponseEntity.ok(responses);
         } catch (Exception e) {
-            String errorMessage = "An error occurred while retrieving product data.";
-            ResponseWrapper<List<ProductDTO>> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
-    @GetMapping("/product/finById/{productId}")
-    public ResponseEntity<ResponseWrapper<ProductDTO>> getProductFinById(
-            @PathVariable Long productId,
-            @RequestHeader("Authorization") String authorizationHeader
-    ) {
+
+
+
+    @GetMapping("/product/findById/{productId}")
+    public ResponseEntity<?> getProductById(@PathVariable Long productId,  @RequestHeader("Authorization") String authorizationHeader) {
         try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<ProductDTO> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                // Token is invalid or has expired
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
-
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret) // Replace with your secret key
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check token expiration
-            Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<ProductDTO> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            String sql = "SELECT tb_products.product_id, tb_products.description, tb_products.product_name, tb_products.price, tb_products.stock_quantity, tb_products.user_id, tb_products.shope_id, tb_products.category_id, tb_products.product_image, tb_products.created_at, tb_categories.category_name, tb_users.first_name, tb_users.last_name, CONCAT(tb_users.first_name, ' ', tb_users.last_name) AS full_name, tb_shop.shop_name FROM `tb_products` JOIN tb_categories ON tb_products.category_id = tb_categories.category_id JOIN tb_users ON tb_products.user_id = tb_users.user_id JOIN tb_shop ON tb_products.shope_id = tb_shop.shop_id WHERE tb_products.product_id = ?";
+            ProductDTO product = jdbcTemplate.queryForObject(sql, new Object[]{productId}, this::mapProductRow);
+            if (product == null) {
+                ResponseWrapper<String> notFoundResponse = new ResponseWrapper<>("Product not found", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
             }
+            List<color_entity> colors = findColorsByProductId(productId);
+            List<size_entity> sizes = findSizesByProductId(productId);
+            List<product_image_entity> productImages = findProductImagesByProductId(productId);
 
-            // Extract necessary claims (you can add more as needed)
-            Long authenticatedUserId = claims.get("user_id", Long.class);
-            String role = claims.get("role_name", String.class);
+            productColorSizeImageDTO response = new productColorSizeImageDTO("Success", product, colors, sizes, productImages);
 
-            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            if (!"shop owner".equalsIgnoreCase(role)) {
-                ResponseWrapper<ProductDTO> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
+            return ResponseEntity.ok(response);
+        }catch (EmptyResultDataAccessException e) {
+            ResponseWrapper<String> notFoundResponse = new ResponseWrapper<>("Product not found", null);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
 
-            // Query the database to retrieve product data
-            String sql = "SELECT\n" +
-                    "    p.product_id,\n" +
-                    "    p.product_name,\n" +
-                    "    p.description,\n" +
-                    "    p.price,\n" +
-                    "    p.stock_quantity,\n" +
-                    "    p.created_at,\n" +
-                    "    p.user_id,\n" +
-                    "    p.shope_id,\n" +
-                    "    p.product_image,\n" +
-                    "    p.product_any_image,\n" +
-                    "    p.category_id,\n" +
-                    "    u.first_name,\n" +
-                    "    c.category_id\n" +
-                    "FROM tb_products p\n" +
-                    "JOIN tb_users u ON p.user_id = u.user_id\n" +
-                    "JOIN tb_categories c ON p.category_id = c.category_id\n" +
-                    "WHERE p.product_id = ?";
-
-            ProductDTO productDTO = jdbcTemplate.queryForObject(sql, new Object[]{productId}, (resultSet, rowNum) -> {
-                ProductDTO product = new ProductDTO();
-                product.setProduct_id(resultSet.getLong("product_id"));
-                product.setDescription(resultSet.getString("description"));
-                product.setProduct_name(resultSet.getString("product_name"));
-                product.setPrice(resultSet.getBigDecimal("price"));
-                product.setStock_quantity(resultSet.getInt("stock_quantity"));
-                product.setUser_id(resultSet.getLong("user_id"));
-                product.setShope_id(resultSet.getLong("shope_id"));
-                product.setProduct_image(resultSet.getString("product_image"));
-                product.setProduct_any_image(resultSet.getString("product_any_image"));
-                product.setCategory_id(resultSet.getString("category_id"));
-                product.setCreateBy(resultSet.getString("first_name"));
-                return product;
-            });
-
-            ResponseWrapper<ProductDTO> responseWrapper = new ResponseWrapper<>("Product data retrieved successfully.", productDTO);
-            return ResponseEntity.ok(responseWrapper);
-        } catch (JwtException e) {
-            // Token is invalid or has expired
-            ResponseWrapper<ProductDTO> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-        } catch (Exception e) {
-            String errorMessage = "product not found.";
-            ResponseWrapper<ProductDTO> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
 
 
     @PostMapping("/product/insert")
@@ -230,30 +140,53 @@ public class product_controller {
             List<product_image_entity> productAnyImages = request.getProduct_images();
 
 
-            // Validate authorization using authService
+// Validate authorization using authService
             ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
             if (authResponse.getStatusCode() != HttpStatus.OK) {
-            // Token is invalid or has expired
+// Token is invalid or has expired
                 ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
+// Check if required fields are not null and price is greater than 0
+            if (product.getProduct_name() == null || product.getPrice() == null || product.getStock_quantity() == -1) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product name, price, and stock quantity cannot be null. Price must be greater than 0.", null);
+                return ResponseEntity.badRequest().body(responseWrapper);
+            }
+            if (product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Price must be greater than 0.", null);
+                return ResponseEntity.badRequest().body(responseWrapper);
+            }
 
-            // Save the product using the repository
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+// Extract necessary claims (you can add more as needed)
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+            Long shopId = claims.get("shop_id", Long.class);
+            System.out.println(shopId);
+
+
+// Save the product using the repository
+            product.setUser_id(authenticatedUserId);
+            product.setShop_id(shopId); // Set the shop_id
             productRepository.save(product);
 
-            // Set the product_id in each color_entity and associate them with the product
+// Set the product_id in each color_entity and associate them with the product
             for (color_entity color : colors) {
                 color.setProduct_id(product.getProduct_id());
             }
-            for(size_entity size:sizes){
+            for (size_entity size : sizes) {
                 size.setProduct_id(product.getProduct_id());
             }
 
-            for(product_image_entity imageOne:productAnyImages){
+            for (product_image_entity imageOne : productAnyImages) {
                 imageOne.setProduct_id(product.getProduct_id());
             }
 
-            // Save the colors using the colorRepository
+// Save the colors using the colorRepository
             colorRepository.saveAll(colors);
             sizeRepository.saveAll(sizes);
             productImageRepository.saveAll(productAnyImages);
@@ -268,7 +201,7 @@ public class product_controller {
     }
 
     @PutMapping("/shop/update_product/{productId}")
-    public ResponseEntity<ResponseWrapper<product_entity>> updateProduct(@PathVariable Long productId, @RequestBody product_entity updatedProduct, @RequestHeader ("Authorization") String authorizationHeader) {
+    public ResponseEntity<ResponseWrapper<product_entity>> updateProduct(@PathVariable Long productId, @RequestBody product_entity updatedProduct, @RequestHeader("Authorization") String authorizationHeader) {
         try {
             if (authorizationHeader == null || authorizationHeader.isBlank()) {
                 ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
@@ -315,6 +248,7 @@ public class product_controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
         }
     }
+
     @DeleteMapping("/shop/delete_product/{productId}")
     public ResponseEntity<ResponseWrapper<String>> deleteProduct(
             @PathVariable Long productId,
@@ -359,6 +293,67 @@ public class product_controller {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    // function of product
+    private ProductDTO mapProductRow(ResultSet rs, int rowNum) throws SQLException {
+        ProductDTO product = new ProductDTO();
+        product.setProduct_id(rs.getLong("product_id"));
+        product.setDescription(rs.getString("description"));
+        product.setProduct_name(rs.getString("product_name"));
+        product.setPrice(rs.getDouble("price"));
+        product.setStock_quantity(rs.getLong("stock_quantity"));
+        product.setUser_id(rs.getLong("user_id"));
+        product.setShope_id(rs.getLong("shope_id"));
+        product.setCategory_id(rs.getLong("category_id"));
+        product.setProduct_image(rs.getString("product_image"));
+        product.setCreateAt(rs.getDate("created_at"));
+
+        // Additional fields
+        product.setCreate_by(rs.getString("full_name"));
+        product.setCategory_name(rs.getString("category_name"));
+        product.setShop_name(rs.getString("shop_name"));
+
+        return product;
+    }
+    private List<color_entity> findColorsByProductId(Long productId) {
+        String sql = "SELECT * FROM product_color WHERE product_id = ?";
+        return jdbcTemplate.query(sql, this::mapColorRow, productId);
+    }
+
+    private color_entity mapColorRow(ResultSet rs, int rowNum) throws SQLException {
+        color_entity color = new color_entity();
+        color.setColor_id(rs.getLong("color_id"));
+        color.setColor_name(rs.getString("color_name"));
+        color.setProduct_id(rs.getLong("product_id"));
+
+        return color;
+    }
+
+    private List<size_entity> findSizesByProductId(Long productId) {
+        String sql = "SELECT * FROM product_size WHERE product_id = ?";
+        return jdbcTemplate.query(sql, this::mapSizeRow, productId);
+    }
+
+    private size_entity mapSizeRow(ResultSet rs, int rowNum) throws SQLException {
+        size_entity size = new size_entity();
+        size.setSize_id(rs.getLong("size_id"));
+        size.setSize_name(rs.getString("size_name"));
+        size.setProduct_id(rs.getLong("product_id"));
+        return size;
+    }
+
+    private List<product_image_entity> findProductImagesByProductId(Long productId) {
+        String sql = "SELECT * FROM product_images WHERE product_id = ?";
+        return jdbcTemplate.query(sql, this::mapProductImageRow, productId);
+    }
+
+    private product_image_entity mapProductImageRow(ResultSet rs, int rowNum) throws SQLException {
+        product_image_entity productImage = new product_image_entity();
+        productImage.setImage_id(rs.getLong("image_id"));
+        productImage.setProduct_image_path(rs.getString("product_image_path"));
+        productImage.setProduct_id(rs.getLong("product_id"));
+        return productImage;
+    }
+
 
 
 }
