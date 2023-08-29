@@ -95,6 +95,7 @@ public class user_controller {
                 userEntity.setLast_name(resultSet.getString("last_name"));
                 userEntity.setGender(resultSet.getString("role_name"));
                 userEntity.setPassword(resultSet.getString("password"));
+                userEntity.setRole_id(resultSet.getLong("role_id"));
                 return userEntity;
             });
 
@@ -108,6 +109,7 @@ public class user_controller {
                     claims.put("first_name", userExist.getFirst_name());
                     claims.put("last_name", userExist.getLast_name());
                     claims.put("role_name", userExist.getGender());
+                    claims.put("role_id", userExist.getRole_id());
 
                     String token = Jwts.builder()
                             .setClaims(claims)

@@ -4,6 +4,10 @@ package com.Auton.gibg.controller.product;
 
 import com.Auton.gibg.entity.product.product_entity;
 import com.Auton.gibg.entity.user.user_entity;
+import com.Auton.gibg.middleware.authToken;
+import com.Auton.gibg.repository.product.color_repository;
+import com.Auton.gibg.repository.product.product_image_repository;
+import com.Auton.gibg.repository.product.size_repository;
 import com.Auton.gibg.response.ResponseWrapper;
 import com.Auton.gibg.response.usersDTO.ProductDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,24 +33,24 @@ public class product_controller {
     @Value("${jwt_secret}")
     private String jwt_secret;
     private final JdbcTemplate jdbcTemplate;
+    private final authToken authService;
 
-
-    // เมธอดสำหรับตรวจสอบว่าค่าที่รับเข้ามาเป็นตัวเลขที่ถูกต้องหรือไม่
-    private boolean isValidNumberFormat(String value) {
-        try {
-            Double.parseDouble(value);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
     @Autowired
-    private product_repository ProductRepository;
+    private color_repository colorRepository;
+
+    @Autowired
+    private size_repository sizeRepository;
+    @Autowired
+    private product_image_repository productImageRepository;
+
+    @Autowired
+    private product_repository productRepository;
     @Autowired
     private user_repository userRepository;
 
-    public product_controller(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public product_controller(JdbcTemplate jdbcTemplate, authToken authService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.authService = authService;
     }
     @GetMapping("/product/all")
     public ResponseEntity<ResponseWrapper<List<ProductDTO>>> getProductOnly(
@@ -216,68 +220,51 @@ public class product_controller {
     }
 
 
-    @PostMapping("/shop/add_product")
-    public ResponseEntity<ResponseWrapper<product_entity>> addProductToShop(@RequestBody product_entity product, @RequestHeader("Authorization") String authorizationHeader) {
+    @PostMapping("/product/insert")
+    public ResponseEntity<ResponseWrapper<String>> insertProduct(@RequestBody ProductWithColorsRequest request,
+                                                                 @RequestHeader("Authorization") String authorizationHeader) {
         try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+            product_entity product = request.getProduct();
+            List<color_entity> colors = request.getColors();
+            List<size_entity> sizes = request.getSizes();
+            List<product_image_entity> productAnyImages = request.getProduct_images();
+
+
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+            // Token is invalid or has expired
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
+            // Save the product using the repository
+            productRepository.save(product);
 
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret)
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check token expiration
-            Date expiration = claims.getExpiration();
-            if (expiration != null && expiration.before(new Date())) {
-                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            // Set the product_id in each color_entity and associate them with the product
+            for (color_entity color : colors) {
+                color.setProduct_id(product.getProduct_id());
+            }
+            for(size_entity size:sizes){
+                size.setProduct_id(product.getProduct_id());
             }
 
-            // Extract necessary claims (you can add more as needed)
-            Long userId = claims.get("user_id", Long.class);
-            String role = claims.get("role_name", String.class);
-
-            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            if (!"shop owner".equalsIgnoreCase(role)) {
-                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+            for(product_image_entity imageOne:productAnyImages){
+                imageOne.setProduct_id(product.getProduct_id());
             }
-//            if (!isValidCategoryId(Long.valueOf(product.getCategory_id()))) {
-//                // Handle invalid category_id
-//                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Invalid category_id. Please provide a valid number.", null);
-//                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseWrapper);
-//            }
-            // Find the user by userId
-            user_entity user = userRepository.findById(userId).orElse(null);
 
-            product.setUser_id(userId.longValue());
-            product.setShope_id(user.getShop_id());
+            // Save the colors using the colorRepository
+            colorRepository.saveAll(colors);
+            sizeRepository.saveAll(sizes);
+            productImageRepository.saveAll(productAnyImages);
 
-            // บันทึกข้อมูลสินค้าลงในฐานข้อมูลหรือระบบจัดเก็บข้อมูล
-            product_entity addedProduct = ProductRepository.save(product);
-
-            ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Product added successfully", addedProduct);
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product and colors inserted successfully", null);
             return ResponseEntity.ok(responseWrapper);
         } catch (Exception e) {
             e.printStackTrace();
-            String errorMessage = "Invalid category_id. Please provide a valid number";
-            ResponseWrapper<product_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("An error occurred while inserting the product and colors", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
         }
-    }
-    private boolean isValidPrice(BigDecimal price) {
-        // You can add additional checks here if needed
-        return price != null && price.compareTo(BigDecimal.ZERO) >= 0;
-    }
-    private boolean isValidCategoryId(Long category_Id) {
-        // Check if the categoryId is a valid number (you can add additional checks here if needed)
-        return category_Id != null && category_Id > 0;
     }
 
     @PutMapping("/shop/update_product/{productId}")
@@ -304,7 +291,7 @@ public class product_controller {
             }
 
             // ดึงข้อมูลสินค้าจากฐานข้อมูล
-            product_entity existingProduct = ProductRepository.findById(productId).orElse(null);
+            product_entity existingProduct = productRepository.findById(productId).orElse(null);
 
             if (existingProduct == null) {
                 ResponseWrapper<product_entity> notFoundResponse = new ResponseWrapper<>("Product not found", null);
@@ -317,7 +304,7 @@ public class product_controller {
             // ... อัพเดตข้อมูลอื่น ๆ ตามต้องการ ...
 
             // บันทึกการเปลี่ยนแปลงลงในฐานข้อมูล
-            ProductRepository.save(existingProduct);
+            productRepository.save(existingProduct);
 
             ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Product updated successfully", existingProduct);
             return ResponseEntity.ok(responseWrapper);
@@ -355,13 +342,13 @@ public class product_controller {
             }
 
             // Check if the product exists in the database
-            if (!ProductRepository.existsById(productId)) {
+            if (!productRepository.existsById(productId)) {
                 ResponseWrapper<String> notFoundResponse = new ResponseWrapper<>("Product not found", null);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
             }
 
             // Delete the product from the database
-            ProductRepository.deleteById(productId);
+            productRepository.deleteById(productId);
 
             ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product deleted successfully", "Deleted");
             return ResponseEntity.ok(responseWrapper);

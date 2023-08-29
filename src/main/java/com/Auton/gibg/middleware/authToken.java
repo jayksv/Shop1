@@ -40,10 +40,11 @@ public class authToken {
 
             // Extract necessary claims (you can add more as needed)
             Long authenticatedUserId = claims.get("user_id", Long.class);
+            Long roleId = claims.get("role_id", Long.class);
             String role = claims.get("role_name", String.class);
 
             // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
-            if (!"shop owner".equalsIgnoreCase(role) && !"Admin".equalsIgnoreCase(role)) {
+            if (roleId !=3  ) {
                 ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
             }
