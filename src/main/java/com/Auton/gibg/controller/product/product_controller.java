@@ -200,97 +200,113 @@ public class product_controller {
         }
     }
 
-    @PutMapping("/shop/update_product/{productId}")
-    public ResponseEntity<ResponseWrapper<product_entity>> updateProduct(@PathVariable Long productId, @RequestBody product_entity updatedProduct, @RequestHeader("Authorization") String authorizationHeader) {
-        try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
-            }
-
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
-
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret)
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            String role = claims.get("role_name", String.class);
-            if (!"shop owner".equalsIgnoreCase(role)) {
-                ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
-
-            // ดึงข้อมูลสินค้าจากฐานข้อมูล
-            product_entity existingProduct = productRepository.findById(productId).orElse(null);
-
-            if (existingProduct == null) {
-                ResponseWrapper<product_entity> notFoundResponse = new ResponseWrapper<>("Product not found", null);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
-            }
-
-            // อัพเดตข้อมูลสินค้าที่ได้รับมาจาก Request ลงในสินค้าที่มีอยู่ในฐานข้อมูล
-            existingProduct.setProduct_name(updatedProduct.getProduct_name());
-            existingProduct.setDescription(updatedProduct.getDescription());
-            // ... อัพเดตข้อมูลอื่น ๆ ตามต้องการ ...
-
-            // บันทึกการเปลี่ยนแปลงลงในฐานข้อมูล
-            productRepository.save(existingProduct);
-
-            ResponseWrapper<product_entity> responseWrapper = new ResponseWrapper<>("Product updated successfully", existingProduct);
-            return ResponseEntity.ok(responseWrapper);
-        } catch (Exception e) {
-            e.printStackTrace();
-            String errorMessage = "product not found.";
-            ResponseWrapper<product_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
-        }
-    }
-
-    @DeleteMapping("/shop/delete_product/{productId}")
-    public ResponseEntity<ResponseWrapper<String>> deleteProduct(
+    @PutMapping("/product/update/{productId}")
+    public ResponseEntity<ResponseWrapper<String>> updateProduct(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String authorizationHeader
-    ) {
+            @RequestBody ProductWithColorsRequest request,
+            @RequestHeader("Authorization") String authorizationHeader) {
         try {
-            if (authorizationHeader == null || authorizationHeader.isBlank()) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
             }
 
-            // Verify the token from the Authorization header
-            String token = authorizationHeader.substring("Bearer ".length());
-
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwt_secret)
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Check if the user has the appropriate role to perform this action (e.g., shop owner)
-            String role = claims.get("role_name", String.class);
-            if (!"shop owner".equalsIgnoreCase(role)) {
-                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
-            }
-
-            // Check if the product exists in the database
-            if (!productRepository.existsById(productId)) {
+            product_entity existingProduct = productRepository.findById(productId).orElse(null);
+            if (existingProduct == null) {
                 ResponseWrapper<String> notFoundResponse = new ResponseWrapper<>("Product not found", null);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
             }
 
-            // Delete the product from the database
-            productRepository.deleteById(productId);
+            // Check if required fields are not null and price is greater than 0
+            if (request.getProduct().getProduct_name() == null || request.getProduct().getPrice() == null || request.getProduct().getStock_quantity() == -1 ) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product name, price, and stock quantity cannot be null. Price must be greater than 0.", null);
+                return ResponseEntity.badRequest().body(responseWrapper);
+            }
+            if ( request.getProduct().getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Price must be greater than 0.", null);
+                return ResponseEntity.badRequest().body(responseWrapper);
+            }
 
-            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product deleted successfully", "Deleted");
+
+            // Update the product fields
+            product_entity updatedProduct = request.getProduct();
+            existingProduct.setDescription(updatedProduct.getDescription());
+            existingProduct.setProduct_name(updatedProduct.getProduct_name());
+            existingProduct.setPrice(updatedProduct.getPrice());
+            existingProduct.setStock_quantity(updatedProduct.getStock_quantity());
+            existingProduct.setProduct_image(updatedProduct.getProduct_image());
+
+            productRepository.save(existingProduct);
+
+            // Update colors using JDBC
+            List<color_entity> updatedColors = request.getColors();
+            for (color_entity updatedColor : updatedColors) {
+                String updateColorSql = "UPDATE product_color SET color_name = ? WHERE product_id = ?";
+                jdbcTemplate.update(updateColorSql, updatedColor.getColor_name(), productId);
+
+            }
+
+            // Update sizes using JDBC
+            List<size_entity> updatedSizes = request.getSizes();
+            for (size_entity updatedSize : updatedSizes) {
+                String updateSizeSql = "UPDATE product_size SET size_name = ? WHERE product_id = ?";
+                jdbcTemplate.update(updateSizeSql, updatedSize.getSize_name(), productId);
+            }
+
+            // Update product images using JDBC
+            List<product_image_entity> updatedProductImages = request.getProduct_images();
+            for (product_image_entity updatedImage : updatedProductImages) {
+                String updateImageSql = "UPDATE product_images SET product_image_path = ? WHERE product_id = ?";
+                jdbcTemplate.update(updateImageSql, updatedImage.getProduct_image_path(), productId);
+            }
+
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product and associated entities updated successfully", null);
             return ResponseEntity.ok(responseWrapper);
         } catch (Exception e) {
             e.printStackTrace();
-            String errorMessage = "An error occurred while retrieving product data.";
-            ResponseWrapper<String> errorResponse = new ResponseWrapper<>(errorMessage, null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("An error occurred while updating the product and associated entities", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
+        }
+    }
+
+    @DeleteMapping("/product/delete/{productId}")
+    public ResponseEntity<ResponseWrapper<String>> deleteProduct(@PathVariable Long productId, @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Check if the product exists
+            product_entity existingProduct = productRepository.findById(productId).orElse(null);
+            if (existingProduct == null) {
+                ResponseWrapper<String> notFoundResponse = new ResponseWrapper<>("Product not found", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
+            }
+
+            // Delete product and associated entities using SQL
+            String deleteProductSql = "DELETE FROM tb_products WHERE product_id = ?";
+            jdbcTemplate.update(deleteProductSql, productId);
+
+            String deleteColorsSql = "DELETE FROM product_color WHERE product_id = ?";
+            jdbcTemplate.update(deleteColorsSql, productId);
+
+            String deleteSizesSql = "DELETE FROM product_size WHERE product_id = ?";
+            jdbcTemplate.update(deleteSizesSql, productId);
+
+            String deleteImagesSql = "DELETE FROM product_images WHERE product_id = ?";
+            jdbcTemplate.update(deleteImagesSql, productId);
+
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("Product and associated entities deleted successfully", null);
+            return ResponseEntity.ok(responseWrapper);
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseWrapper<String> responseWrapper = new ResponseWrapper<>("An error occurred while deleting the product and associated entities", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
         }
     }
     // function of product

@@ -1,21 +1,34 @@
 package com.Auton.gibg.controller.shop;
 
 
+import com.Auton.gibg.entity.address.address_entity;
+import com.Auton.gibg.entity.shop.shop_entity;
+import com.Auton.gibg.entity.user.UserAddressShopWrapper;
+import com.Auton.gibg.entity.user.user_entity;
 import com.Auton.gibg.middleware.authToken;
-import com.Auton.gibg.repository.shop.shop_repostory;
+import com.Auton.gibg.repository.shop.ShopRepository;
 import com.Auton.gibg.response.ResponseWrapper;
 import com.Auton.gibg.response.shopAllDTO;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/shopowner")
 public class shop_controller {
+
+    @Value("${jwt_secret}")
+    private String jwt_secret;
 //    private final JdbcTemplate jdbcTemplate;
 //
 //    @Autowired
@@ -80,7 +93,7 @@ private final JdbcTemplate jdbcTemplate;
 
     private final authToken authService;
     @Autowired
-    private shop_repostory shopRepostory;
+    private ShopRepository shoprepostory;
     public shop_controller(JdbcTemplate jdbcTemplate,  authToken authService) {
         this.jdbcTemplate = jdbcTemplate;
         this.authService = authService;
@@ -270,6 +283,53 @@ private final JdbcTemplate jdbcTemplate;
         }
 
 
+    }
+    @PutMapping("/update/shop")
+    public ResponseEntity<ResponseWrapper<user_entity>> updateUserWithShop(
+            @RequestBody UserAddressShopWrapper userAddressShopWrapper,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Verify the token from the Authorization header
+            // ... (previous code)
+
+            // Extract necessary claims (you can add more as needed)
+            // ... (previous code)
+
+            // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
+            // ... (previous code)
+
+            // ดึงข้อมูลร้านค้าของผู้ใช้ที่เป็นเจ้าของร้าน
+            Optional<shop_entity> existingShop = shop_repository.findByUserId(authenticatedUserId);
+
+            if (existingShop.isPresent()) {
+                shop_entity shopToUpdate = existingShop.get();
+
+                // Update shop's information
+                shop_entity updatedShop = userAddressShopWrapper.getUserShop();
+                shopToUpdate.setShopName(updatedShop.getShopName());
+                shopToUpdate.setStreetAddress(updatedShop.getStreetAddress());
+                // ... (อัพเดตฟิลด์อื่นๆ ในร้านค้า)
+
+                // Save the updated shop entity
+                shop_repository.save(shopToUpdate);
+
+                // สร้าง response ที่สำเร็จ
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User and shop updated successfully.", authenticatedUser.get());
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User's shop not found.", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
+            }
+        } catch (JwtException e) {
+            // Token is invalid or has expired
+            ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errorMessage = "An error occurred while updating the user information.";
+            ResponseWrapper<user_entity> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 
 }
