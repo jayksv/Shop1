@@ -9,24 +9,20 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.swagger.annotations.Api;
-import io.swagger.models.Contact;
-import org.apache.catalina.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import com.Auton.gibg.repository.user.user_repository;
-import com.Auton.gibg.repository.address.address_repoittory;
-import com.Auton.gibg.repository.shop.shop_repostory;
+import com.Auton.gibg.repository.address.address_repository;
+import com.Auton.gibg.repository.shop.shop_repository;
 import com.Auton.gibg.entity.user.user_entity;
 import com.Auton.gibg.entity.address.address_entity;
 import com.Auton.gibg.entity.shop.shop_entity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import com.Auton.gibg.entity.user.UserAddressWrapper;
 import com.Auton.gibg.middleware.authToken;
 
 
@@ -50,10 +46,10 @@ public class user_controller {
     private user_repository user_repository;
 
     @Autowired
-    private address_repoittory address_repoittory;
+    private address_repository address_repository;
 
     @Autowired
-    private shop_repostory shop_repostory;
+    private shop_repository shop_repository;
 
     @Autowired
     public user_controller(JdbcTemplate jdbcTemplate, authToken authService) {
@@ -436,10 +432,10 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
         }
         else {
             // Save the user address
-            address_entity savedAddress = address_repoittory.save(userAddress);
+            address_entity savedAddress = address_repository.save(userAddress);
             // shop information
-            userShop.setShop_status_id((long)3);
-            shop_entity savedShop = shop_repostory.save(userShop);
+            userShop.setShop_status_id((long)1);
+            shop_entity savedShop = shop_repository.save(userShop);
 
 
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
@@ -548,8 +544,8 @@ System.out.println(authenticatedUserId);
                 return ResponseEntity.ok(newResponseWrapper);
             }
 
-            Optional<address_entity> existingAddress = address_repoittory.findById(userOptional.get().getAddress_id());
-            Optional<shop_entity> existingShop = shop_repostory.findById(userOptional.get().getShop_id());
+            Optional<address_entity> existingAddress = address_repository.findById(userOptional.get().getAddress_id());
+            Optional<shop_entity> existingShop = shop_repository.findById(userOptional.get().getShop_id());
 
             user_entity existingUser = userOptional.get();
             address_entity addressToUpdate = existingAddress.get();
@@ -605,8 +601,8 @@ System.out.println(authenticatedUserId);
 
             // Save the updated entities
             user_repository.save(existingUser);
-            shop_repostory.save(shopToUpdate);
-            address_repoittory.save(addressToUpdate);
+            shop_repository.save(shopToUpdate);
+            address_repository.save(addressToUpdate);
 
 
             ResponseWrapper<user_entity> newResponseWrapper = new ResponseWrapper<>("User updated successfully.", authenticatedUser.get());
@@ -709,10 +705,10 @@ System.out.println(authenticatedUserId);
             Long shopId = existingUser.getShop_id();
 
             // Delete associated address
-            address_repoittory.deleteById(addressId);
+            address_repository.deleteById(addressId);
 
             // Delete associated shop owner
-            shop_repostory.deleteById(shopId);
+            shop_repository.deleteById(shopId);
 
             // Delete user
             user_repository.deleteById(userId);

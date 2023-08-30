@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.Time;
 
 @Entity
@@ -100,4 +101,6 @@ public class shop_entity {
         @Column(name = "shop_status_id")
         private Long shop_status_id;
 
-    }
+        @Column(name = "created_at")
+        private Date created_at;
+}

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.Date;
+import java.util.Optional;
 
 
 @Entity
@@ -55,6 +56,7 @@ public class user_entity {
 
     @Column(name = "shop_id")
     private Long shop_id;
+
 
 };
 

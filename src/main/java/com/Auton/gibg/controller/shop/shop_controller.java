@@ -6,7 +6,9 @@ import com.Auton.gibg.entity.shop.shop_entity;
 import com.Auton.gibg.entity.user.UserAddressShopWrapper;
 import com.Auton.gibg.entity.user.user_entity;
 import com.Auton.gibg.middleware.authToken;
-import com.Auton.gibg.repository.shop.ShopRepository;
+import com.Auton.gibg.repository.address.address_repository;
+import com.Auton.gibg.repository.shop.shop_repository;
+import com.Auton.gibg.repository.user.user_repository;
 import com.Auton.gibg.response.ResponseWrapper;
 import com.Auton.gibg.response.shopAllDTO;
 import io.jsonwebtoken.Claims;
@@ -93,7 +95,11 @@ private final JdbcTemplate jdbcTemplate;
 
     private final authToken authService;
     @Autowired
-    private ShopRepository shoprepostory;
+    private shop_repository shop_repository;
+    @Autowired
+    private user_repository user_repository;
+    @Autowired
+    private address_repository address_repository;
     public shop_controller(JdbcTemplate jdbcTemplate,  authToken authService) {
         this.jdbcTemplate = jdbcTemplate;
         this.authService = authService;
@@ -284,42 +290,120 @@ private final JdbcTemplate jdbcTemplate;
 
 
     }
-    @PutMapping("/update/shop")
-    public ResponseEntity<ResponseWrapper<user_entity>> updateUserWithShop(
+    @PutMapping("/user/update_shopowner/{userId}")
+    public ResponseEntity<ResponseWrapper<user_entity>> updateUserWithShopOwner(
+            @PathVariable Long userId,
             @RequestBody UserAddressShopWrapper userAddressShopWrapper,
             @RequestHeader("Authorization") String authorizationHeader) {
         try {
+            if (authorizationHeader == null || authorizationHeader.isBlank()) {
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
             // Verify the token from the Authorization header
-            // ... (previous code)
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Check token expiration
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("Token has expired.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
 
             // Extract necessary claims (you can add more as needed)
-            // ... (previous code)
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+            String role = claims.get("role_name", String.class);
 
             // Check if the authenticated user has the appropriate role to perform this action (e.g., admin)
-            // ... (previous code)
+            if (!"shop owner".equalsIgnoreCase(role)) {
 
-            // ดึงข้อมูลร้านค้าของผู้ใช้ที่เป็นเจ้าของร้าน
-            Optional<shop_entity> existingShop = shop_repository.findByUserId(authenticatedUserId);
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("You are not authorized to perform this action.", null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
+            }
 
-            if (existingShop.isPresent()) {
-                shop_entity shopToUpdate = existingShop.get();
+            user_entity updatedUser = userAddressShopWrapper.getUser();
+            address_entity updatedAddress = userAddressShopWrapper.getUserAddress();
+            shop_entity updatedShop = userAddressShopWrapper.getUserShop();
 
-                // Update shop's information
-                shop_entity updatedShop = userAddressShopWrapper.getUserShop();
-                shopToUpdate.setShopName(updatedShop.getShopName());
-                shopToUpdate.setStreetAddress(updatedShop.getStreetAddress());
-                // ... (อัพเดตฟิลด์อื่นๆ ในร้านค้า)
+            // Find the existing user by ID
+            Optional<user_entity> userOptional = user_repository.findById(userId);
 
-                // Save the updated shop entity
-                shop_repository.save(shopToUpdate);
-
-                // สร้าง response ที่สำเร็จ
-                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User and shop updated successfully.", authenticatedUser.get());
-                return ResponseEntity.ok(responseWrapper);
-            } else {
-                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User's shop not found.", null);
+            if (userOptional.isEmpty()) {
+                ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User not found.", null);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
             }
+
+            Optional<address_entity> existingAddress = address_repository.findById(userOptional.get().getAddress_id());
+            Optional<shop_entity> existingShop = shop_repository.findById(userOptional.get().getShop_id());
+
+            user_entity existingUser = userOptional.get();
+            address_entity addressToUpdate = existingAddress.get();
+            shop_entity shopToUpdate = existingShop.get();
+
+
+            // Update user's information
+            user_entity userToUpdate = userOptional.get();
+//            userToUpdate.setEmail(updatedUser.getEmail());
+            userToUpdate.setPassword(updatedUser.getPassword());
+            userToUpdate.setFirst_name(updatedUser.getFirst_name());
+            userToUpdate.setLast_name(updatedUser.getLast_name());
+            userToUpdate.setBirthdate(updatedUser.getBirthdate());
+            userToUpdate.setGender(updatedUser.getGender());
+            userToUpdate.setProfile_picture(updatedUser.getProfile_picture());
+            userToUpdate.setBio(updatedUser.getBio());
+            userToUpdate.setRole_id(updatedUser.getRole_id());
+
+            // Update shop's information
+            shop_entity shopOwnToUpdate = existingShop.get();
+            shopOwnToUpdate.setShopName(updatedShop.getShopName());
+            shopOwnToUpdate.setStreetAddress(updatedShop.getStreetAddress());
+            shopOwnToUpdate.setCity(updatedShop.getCity());
+            shopOwnToUpdate.setState(updatedShop.getState());
+            shopOwnToUpdate.setPostalCode(updatedShop.getPostalCode());
+            shopOwnToUpdate.setCountry(updatedShop.getCountry());
+            shopOwnToUpdate.setLongitude(updatedShop.getLongitude());
+            shopOwnToUpdate.setLatitude(updatedShop.getLatitude());
+            shopOwnToUpdate.setMondayOpen(updatedShop.getMondayOpen());
+            shopOwnToUpdate.setMondayClose(updatedShop.getMondayClose());
+            shopOwnToUpdate.setTuesday_open(updatedShop.getTuesday_open());
+            shopOwnToUpdate.setTuesday_close(updatedShop.getTuesday_close());
+            shopOwnToUpdate.setWednesday_open(updatedShop.getWednesday_open());
+            shopOwnToUpdate.setWednesday_close(updatedShop.getWednesday_close());
+            shopOwnToUpdate.setThursday_open(updatedShop.getThursday_open());
+            shopOwnToUpdate.setThursday_close(updatedShop.getThursday_close());
+            shopOwnToUpdate.setFriday_open(updatedShop.getFriday_open());
+            shopOwnToUpdate.setFriday_close(updatedShop.getFriday_close());
+            shopOwnToUpdate.setSaturday_open(updatedShop.getSaturday_open());
+            shopOwnToUpdate.setSaturday_close(updatedShop.getSaturday_close());
+            shopOwnToUpdate.setSunday_open(updatedShop.getSunday_open());
+            shopOwnToUpdate.setSunday_close(updatedShop.getSunday_close());
+            shopToUpdate.setShop_type_id(updatedShop.getShop_type_id());
+
+
+            // Update address information
+            address_entity addressToUpdates = existingAddress.get();
+            addressToUpdates.setStreetAddress(updatedAddress.getStreetAddress());
+            addressToUpdates.setState(updatedAddress.getState());
+            addressToUpdates.setPostalCode(updatedAddress.getPostalCode());
+            addressToUpdates.setCountry(updatedAddress.getCountry());
+            addressToUpdates.setLatitude(updatedAddress.getLatitude());
+            addressToUpdates.setLongitude(updatedAddress.getLongitude());
+
+            // Save the updated entities
+            user_repository.save(existingUser);
+            shop_repository.save(shopToUpdate);
+            address_repository.save(addressToUpdate);
+
+
+            ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("User information updated successfully.", null);
+            return ResponseEntity.ok(responseWrapper);
+
         } catch (JwtException e) {
             // Token is invalid or has expired
             ResponseWrapper<user_entity> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
@@ -331,5 +415,100 @@ private final JdbcTemplate jdbcTemplate;
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+    @PutMapping("/shop/update")
+    public ResponseEntity<ResponseWrapper<Void>> updateShopById(
+
+            @RequestBody shop_entity updatedShop,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            // Validate authorization using authService
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                // Token is invalid or has expired
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Token is invalid.", null);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseWrapper);
+            }
+
+            // Verify the token from the Authorization header
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret) // Replace with your secret key
+                    .parseClaimsJws(token)
+                    .getBody();
+
+
+
+            // Extract necessary claims (you can add more as needed)
+            Long authenticatedshopId = claims.get("shop_id", Long.class);
+            System.out.println(updatedShop.getShop_status_id());
+
+            // Check if the shop status allows updates
+            Long shopStatusId = updatedShop.getShop_status_id();
+            if (shopStatusId.equals(1L)) {
+                ResponseWrapper<Void> statusResponse = new ResponseWrapper<>("Cannot update shop with pending status.", null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(statusResponse);
+            }
+
+            // Prepare the SQL query to update all columns of the shop
+            String updateShopSql = "UPDATE tb_shop SET "
+                    + "shop_name = ?, street_address = ?, city = ?, state = ?, "
+                    + "postal_code = ?, country = ?, latitude = ?, longitude = ?, "
+                    + "shop_type_id = ?, shop_image = ?, shop_status_id = ?, "
+                    + "monday_open = ?, monday_close = ?, tuesday_open = ?, tuesday_close = ?, "
+                    + "wednesday_open = ?, wednesday_close = ?, thursday_open = ?, thursday_close = ?, "
+                    + "friday_open = ?, friday_close = ?, saturday_open = ?, saturday_close = ?, "
+                    + "sunday_open = ?, sunday_close = ?, created_at = ? "
+                    + "WHERE shop_id = ?";
+            if (shopStatusId.equals(3L)) {
+                updatedShop.setShop_status_id(1L);
+            }
+            int rowsAffected = jdbcTemplate.update(
+                    updateShopSql,
+                    updatedShop.getShopName(),
+                    updatedShop.getStreetAddress(),
+                    updatedShop.getCity(),
+                    updatedShop.getState(),
+                    updatedShop.getPostalCode(),
+                    updatedShop.getCountry(),
+                    updatedShop.getLatitude(),
+                    updatedShop.getLongitude(),
+                    updatedShop.getShop_type_id(),
+                    updatedShop.getShop_image(),
+                   updatedShop.getShop_status_id(),
+                    updatedShop.getMondayOpen(),
+                    updatedShop.getMondayClose(),
+                    updatedShop.getThursday_open(),
+                    updatedShop.getThursday_close(),
+                    updatedShop.getWednesday_open(),
+                    updatedShop.getWednesday_close(),
+                    updatedShop.getTuesday_open(),
+                    updatedShop.getTuesday_close(),
+                    updatedShop.getFriday_open(),
+                    updatedShop.getFriday_close(),
+                    updatedShop.getSaturday_open(),
+                    updatedShop.getSaturday_close(),
+                    updatedShop.getSunday_open(),
+                    updatedShop.getSunday_close(),
+                    updatedShop.getCreated_at(),
+                    authenticatedshopId
+            );
+
+
+            if (rowsAffected > 0) {
+                ResponseWrapper<Void> responseWrapper = new ResponseWrapper<>("Shop updated successfully.", null);
+                return ResponseEntity.ok(responseWrapper);
+            } else {
+                ResponseWrapper<Void> notFoundResponse = new ResponseWrapper<>("Shop not found or not updated.", null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFoundResponse);
+            }
+        } catch (Exception e) {
+            String errorMessage = "An error occurred while updating the shop.";
+            ResponseWrapper<Void> errorResponse = new ResponseWrapper<>(errorMessage, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+
 
 }
