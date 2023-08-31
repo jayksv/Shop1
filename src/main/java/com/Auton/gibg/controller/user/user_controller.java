@@ -1,8 +1,17 @@
 package com.Auton.gibg.controller.user;
 
 
+import com.Auton.gibg.controller.product.color_entity;
+import com.Auton.gibg.controller.product.product_image_entity;
+import com.Auton.gibg.controller.product.size_entity;
+import com.Auton.gibg.controller.shop.shop_amenitie_entity;
+import com.Auton.gibg.controller.shop.shop_image_entity;
+import com.Auton.gibg.controller.shop.shop_service_entity;
 import com.Auton.gibg.entity.user.LoginResponse;
 import com.Auton.gibg.entity.user.UserAddressShopWrapper;
+import com.Auton.gibg.repository.shop.shop_amenitie_repository;
+import com.Auton.gibg.repository.shop.shop_image_repository;
+import com.Auton.gibg.repository.shop.shop_service_repository;
 import com.Auton.gibg.response.ResponseWrapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -50,6 +59,12 @@ public class user_controller {
 
     @Autowired
     private shop_repository shop_repository;
+    @Autowired
+    private shop_amenitie_repository amenitierepository;
+    @Autowired
+    private shop_image_repository imagerepository;
+    @Autowired
+    private shop_service_repository servicerepository;
 
     @Autowired
     public user_controller(JdbcTemplate jdbcTemplate, authToken authService) {
@@ -350,7 +365,7 @@ public class user_controller {
 //}
 //----------------------------------------------------------------Manage shop owner information
 @PostMapping("/user/add_shopowner")
-public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@RequestBody UserAddressShopWrapper UserAddressShopWrapper  , @RequestHeader ("Authorization") String authorizationHeader) {
+public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@RequestBody UserAddressShopWrapper request  , @RequestHeader ("Authorization") String authorizationHeader) {
     try {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Authorization header is missing or empty.", null);
@@ -382,9 +397,12 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseWrapper);
         }
 
-        user_entity user = UserAddressShopWrapper.getUser();
-        address_entity userAddress = UserAddressShopWrapper.getUserAddress();
-        shop_entity userShop = UserAddressShopWrapper.getUserShop();
+        user_entity user = request.getUser();
+        address_entity userAddress = request.getUserAddress();
+        shop_entity userShop = request.getUserShop();
+        List<shop_amenitie_entity> ShopAmenities = request.getShop_amenities();
+        List<shop_service_entity> ShopService = request.getShop_service();
+        List<shop_image_entity> ShopAnyImages = request.getShop_images();
 
 
         // Check for null values and validate email and password length
@@ -436,6 +454,31 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
             // shop information
             userShop.setShop_status_id((long)1);
             shop_entity savedShop = shop_repository.save(userShop);
+            // Save the user amenities
+
+            if (ShopAmenities != null) {
+                for (shop_amenitie_entity amenity : ShopAmenities) {
+                    amenity.setShop_id(savedShop.getShopId()); // Set the shop entity directly
+                    amenitierepository.save(amenity);
+                }
+            }
+
+            if (ShopService != null) {
+                for (shop_service_entity service : ShopService) {
+                    service.setShop_id(savedShop.getShopId()); // Set the shop entity directly
+                    servicerepository.save(service);
+                }
+            }
+
+            if (ShopAnyImages != null) {
+                for (shop_image_entity shopImage : ShopAnyImages) {
+                    shopImage.setShop_id(savedShop.getShopId()); // Set the shop entity directly
+                    imagerepository.save(shopImage);
+                }
+            }
+
+
+
 
 
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();

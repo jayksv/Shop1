@@ -1,12 +1,15 @@
 package com.Auton.gibg.controller.orders;
 
+import com.Auton.gibg.entity.order.OrderDetailEntity;
 import com.Auton.gibg.entity.order.OrderEntity;
 import com.Auton.gibg.middleware.authToken;
+import com.Auton.gibg.repository.order.OrderDetailRepository;
 import com.Auton.gibg.repository.order.OrderRepository;
 import com.Auton.gibg.response.ResponseWrapper;
 import com.Auton.gibg.response.order.orderResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import org.antlr.v4.runtime.misc.LogManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
@@ -22,6 +25,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 import static com.cloudinary.AccessControlRule.AccessType.token;
 
@@ -35,6 +39,8 @@ public class OrderController {
     private String jwt_secret;
     @Autowired
     private OrderRepository orderRepository; // Assuming you have an OrderRepository
+    @Autowired
+    private OrderDetailRepository orderDetailRepository;
 
     public OrderController(JdbcTemplate jdbcTemplate, authToken authService) {
         this.jdbcTemplate = jdbcTemplate;
@@ -106,6 +112,44 @@ public class OrderController {
             e.printStackTrace();
             ResponseWrapper<List<OrderEntity>> responseWrapper = new ResponseWrapper<>("An error occurred while retrieving orders.", null);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
+        }
+    }
+
+    @PostMapping("/add-detail/{orderId}")
+    public ResponseEntity<ResponseWrapper<String>> addOrderDetail(
+            @PathVariable Long orderId,
+            @RequestBody OrderDetailEntity orderDetail,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
+            if (authResponse.getStatusCode() != HttpStatus.OK) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ResponseWrapper<>("Authorization failed.", null));
+            }
+
+            // Get the authenticated user's ID from the claims
+            String token = authorizationHeader.substring("Bearer ".length());
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwt_secret)
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            Long authenticatedUserId = claims.get("user_id", Long.class);
+
+            Optional<OrderEntity> optionalOrder = orderRepository.findById(orderId);
+            if (optionalOrder.isPresent()) {
+                OrderEntity order = optionalOrder.get();
+                orderDetail.setOrder(order);
+                orderDetail.setCreateAt(new Date()); // Set current date
+
+                orderDetailRepository.save(orderDetail);
+
+                return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseWrapper<>("Order detail added successfully.", null));
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseWrapper<>("Order not found.", null));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>("Error adding order detail.", null));
         }
     }
 

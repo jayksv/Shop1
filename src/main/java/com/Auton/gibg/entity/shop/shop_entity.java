@@ -101,6 +101,15 @@ public class shop_entity {
         @Column(name = "shop_status_id")
         private Long shop_status_id;
 
+        @Column(name = "shop_phone")
+        private String shop_phone;
+
+        @Column(name = "shop_mail")
+        private String shop_mail;
+
+        @Column(name = "shop_website")
+        private String shop_website;
+
         @Column(name = "created_at")
         private Date created_at;
 }

@@ -44,4 +44,7 @@ public class shopAllDTO {
     private String type_name;
     private String shop_owner;
     private String status_name;
+    private String shop_website;
+    private String shop_mail;
+    private String shop_phone;
 }
