@@ -522,7 +522,7 @@ public class fatch_user_controller {
                 userOneShopower.setShop_country(resultSet.getString("shop_country"));
                 userOneShopower.setShop_latitude(resultSet.getBigDecimal("shop_latitude"));
                 userOneShopower.setShop_longitude(resultSet.getBigDecimal("shop_longitude"));
-                userOneShopower.setShop_type_name(resultSet.getString("type_id"));
+                userOneShopower.setShop_type_name(resultSet.getString("shop_type_id"));
                 userOneShopower.setShop_image(resultSet.getString("shop_image"));
                 userOneShopower.setMonday_open(resultSet.getTime("monday_open"));
                 userOneShopower.setMonday_close(resultSet.getTime("monday_close"));

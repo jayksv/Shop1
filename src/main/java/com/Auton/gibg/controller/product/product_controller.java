@@ -92,8 +92,12 @@ public class product_controller {
 
 
 
-    @GetMapping("/product/findById/{productId}")
-    public ResponseEntity<?> getProductById(@PathVariable Long productId,  @RequestHeader("Authorization") String authorizationHeader) {
+    @GetMapping("/product/findById/{productId}/{param1}/{param2}")
+    public ResponseEntity<?> getProductByIdWithParams(
+            @PathVariable Long productId,
+            @PathVariable String param1,
+            @PathVariable String param2,
+            @RequestHeader("Authorization") String authorizationHeader) {
         try {
 
             // Validate authorization using authService
