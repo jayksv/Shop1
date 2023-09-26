@@ -477,10 +477,6 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
                 }
             }
 
-
-
-
-
             BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
             String encryptedPass = bcrypt.encode(user.getPassword());
             user.setPassword(encryptedPass);
