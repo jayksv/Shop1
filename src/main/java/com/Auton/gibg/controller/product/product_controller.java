@@ -144,6 +144,7 @@ public class product_controller {
             List<product_image_entity> productAnyImages = request.getProduct_images();
 
 
+
 // Validate authorization using authService
             ResponseEntity<?> authResponse = authService.validateAuthorizationHeader(authorizationHeader);
             if (authResponse.getStatusCode() != HttpStatus.OK) {

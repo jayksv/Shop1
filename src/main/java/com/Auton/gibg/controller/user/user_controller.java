@@ -405,6 +405,7 @@ public ResponseEntity<ResponseWrapper<List<user_entity>>> addNewShowOwner(@Reque
         List<shop_image_entity> ShopAnyImages = request.getShop_images();
 
 
+
         // Check for null values and validate email and password length
         if (user.getEmail() == null || user.getPassword() == null || user.getFirst_name() == null || user.getLast_name() == null) {
             ResponseWrapper<List<user_entity>> responseWrapper = new ResponseWrapper<>("Email, password, first name, and last name are required.", null);
