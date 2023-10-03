@@ -701,7 +701,6 @@ public class fatch_user_controller {
             // Extract necessary claims (you can add more as needed)
             Long authenticatedUserId = claims.get("user_id", Long.class);
             String role = claims.get("role_name", String.class);
-            System.out.println(authenticatedUserId);
 
             // Check if the user has the appropriate role to perform this action (e.g., shop owner)
             if (!"shop owner".equalsIgnoreCase(role)) {
